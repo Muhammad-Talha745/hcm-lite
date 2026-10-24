@@ -73,7 +73,7 @@ Employee Inquiries:
 
 📁 Project Architecture
 
-text
+```text
 hcm-lite/
 ├── index.html        # First-run setup & authentication gate
 ├── admin.html        # Admin analytics, metrics, announcements, helper
