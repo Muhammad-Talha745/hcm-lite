@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HCM Lite - Monthly Payslip</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <nav class="navbar" id="main-nav"></nav>
+
+    <div class="container" style="max-width:800px;">
+        <!-- FILTER BAR -->
+        <div class="card no-print" style="margin-bottom:1.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                <div style="display:flex; gap:0.75rem; align-items:center;">
+                    <div id="admin-emp-select-wrap">
+                        <label style="font-size:0.8rem; font-weight:600;">Employee:</label>
+                        <select id="select-emp" class="form-control"
+                            style="width:200px; display:inline-block;"></select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem; font-weight:600;">Month:</label>
+                        <select id="select-month" class="form-control" style="width:140px; display:inline-block;">
+                            <option value="0">January</option>
+                            <option value="1">February</option>
+                            <option value="2">March</option>
+                            <option value="3">April</option>
+                            <option value="4">May</option>
+                            <option value="5">June</option>
+                            <option value="6">July</option>
+                            <option value="7">August</option>
+                            <option value="8">September</option>
+                            <option value="9">October</option>
+                            <option value="10">November</option>
+                            <option value="11">December</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem; font-weight:600;">Year:</label>
+                        <select id="select-year" class="form-control" style="width:100px; display:inline-block;">
+                            <option value="2026" selected>2026</option>
+                            <option value="2025">2025</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <button class="btn btn-primary" onclick="window.print()">Print / Save as PDF</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRINTABLE PAYSLIP CARD -->
+        <div class="card" id="payslip-render-box">
+            <div
+                style="display:flex; justify-content:space-between; border-bottom:2px solid var(--border); padding-bottom:1rem; margin-bottom:1.5rem;">
+                <div>
+                    <h2 id="slip-company" style="color:var(--primary-dark); font-size:1.5rem;">Acme Corp</h2>
+                    <p style="color:var(--text-muted); font-size:0.85rem;">Official Salary Payment Statement</p>
+                </div>
+                <div style="text-align:right;">
+                    <h3 id="slip-month-year" style="font-size:1.1rem;">October 2026</h3>
+                    <span class="badge badge-present">Calculated & Audited</span>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom:1.5rem;">
+                <div>
+                    <p style="font-size:0.85rem; color:var(--text-muted);">Employee Name</p>
+                    <h4 id="slip-name" style="font-size:1.1rem; margin-bottom:0.5rem;">Jane Doe</h4>
+                    <p style="font-size:0.85rem; color:var(--text-muted);">Department</p>
+                    <p id="slip-dept" style="font-weight:600;">Engineering</p>
+                </div>
+                <div>
+                    <p style="font-size:0.85rem; color:var(--text-muted);">Email Address</p>
+                    <p id="slip-email" style="font-weight:600; margin-bottom:0.5rem;">jane@company.com</p>
+                    <p style="font-size:0.85rem; color:var(--text-muted);">Pay Basis</p>
+                    <p id="slip-working-days" style="font-weight:600;">22 Standard Working Days</p>
+                </div>
+            </div>
+
+            <table style="margin-bottom:1.5rem;">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th>Metric</th>
+                        <th>Rate / Breakdown</th>
+                        <th style="text-align:right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Base Monthly Salary</td>
+                        <td>Full Month</td>
+                        <td>Contracted Amount</td>
+                        <td style="text-align:right;" id="slip-base-salary">$0.00</td>
+                    </tr>
+                    <tr>
+                        <td>Calculated Daily Rate</td>
+                        <td>1 Day</td>
+                        <td>Base Salary ÷ Working Days</td>
+                        <td style="text-align:right;" id="slip-daily-rate">$0.00</td>
+                    </tr>
+                    <tr>
+                        <td>Absent Days Deduction</td>
+                        <td id="slip-absent-count">0 Days</td>
+                        <td>Per Day × Absences</td>
+                        <td style="text-align:right; color:var(--danger);" id="slip-absent-deduction">-$0.00</td>
+                    </tr>
+                    <tr>
+                        <td>Half Day Deduction</td>
+                        <td id="slip-halfday-count">0 Half-Days</td>
+                        <td>Per Day × 0.5 × Half Days</td>
+                        <td style="text-align:right; color:var(--danger);" id="slip-halfday-deduction">-$0.00</td>
+                    </tr>
+                    <tr style="border-top:2px solid var(--border); font-size:1.1rem; font-weight:700;">
+                        <td colspan="3">Net Calculated Salary</td>
+                        <td style="text-align:right; color:var(--primary-dark);" id="slip-net-salary">$0.00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div
+                style="font-size:0.775rem; color:var(--text-muted); border-top:1px dashed var(--border); padding-top:1rem; display:flex; justify-content:space-between;">
+                <span>Generated by HCM Lite System Rules</span>
+                <span>Employee Copy</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        const user = Auth.checkAccess(["admin", "employee"]);
+        Auth.renderNavbar("payslip");
+
+        const company = Storage.getCompany() || { name: "Company" };
+        document.getElementById("slip-company").innerText = company.name;
+
+        // Set current month
+        const curDate = new Date();
+        document.getElementById("select-month").value = curDate.getMonth();
+
+        const empSelect = document.getElementById("select-emp");
+        const users = Storage.getUsers();
+
+        if (user.role === "admin") {
+            const emps = users.filter(u => u.role === "employee");
+            empSelect.innerHTML = emps.map(e => `<option value="${e.id}">${e.name} (${e.department || 'General'})</option>`).join("");
+            if (emps.length === 0) {
+                empSelect.innerHTML = `<option value="">No Employees</option>`;
+            }
+        } else {
+            document.getElementById("admin-emp-select-wrap").style.display = "none";
+        }
+
+        function calculatePayslip() {
+            const month = parseInt(document.getElementById("select-month").value);
+            const year = parseInt(document.getElementById("select-year").value);
+
+            const targetEmpId = user.role === "admin"
+                ? parseInt(document.getElementById("select-emp").value)
+                : user.id;
+
+            const emp = users.find(u => u.id === targetEmpId);
+            if (!emp) return;
+
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            document.getElementById("slip-month-year").innerText = `${monthNames[month]} ${year}`;
+            document.getElementById("slip-name").innerText = emp.name;
+            document.getElementById("slip-dept").innerText = emp.department || "General";
+            document.getElementById("slip-email").innerText = emp.email;
+
+            const workingDays = Storage.getWorkingDaysInMonth(year, month);
+            document.getElementById("slip-working-days").innerText = `${workingDays} Standard Working Days`;
+
+            const monthlySalary = emp.salary || 0;
+            const perDayRate = workingDays > 0 ? (monthlySalary / workingDays) : 0;
+
+            // Calculate attendance and approved leaves for that month
+            const attendance = Storage.getAttendance();
+            const leaves = Storage.getLeaves();
+
+            let presentCount = 0;
+            let halfdayCount = 0;
+            let lateCount = 0;
+
+            // Filter month records
+            const pad = (n) => String(n).padStart(2, '0');
+            const startPrefix = `${year}-${pad(month + 1)}`;
+
+            attendance.forEach(a => {
+                if (a.employeeId === emp.id && a.date.startsWith(startPrefix)) {
+                    if (a.status === "present" || a.status === "late") presentCount++;
+                    if (a.status === "halfday") halfdayCount++;
+                    if (a.status === "late") lateCount++;
+                }
+            });
+
+            // Approved leaves in month
+            let approvedLeaveWorkingDays = 0;
+            leaves.forEach(l => {
+                if (l.employeeId === emp.id && l.status === "approved") {
+                    // If leave falls in this month
+                    if (l.from.startsWith(startPrefix) || l.to.startsWith(startPrefix)) {
+                        approvedLeaveWorkingDays += l.days;
+                    }
+                }
+            });
+
+            // Absent Days = Total Working Days - (Present + HalfDays + ApprovedLeaves)
+            // A day without record on a working day is counted as absent per business rules
+            const recordedDays = presentCount + halfdayCount + approvedLeaveWorkingDays;
+            const absentDays = Math.max(0, workingDays - recordedDays);
+
+            const absentDeduction = absentDays * perDayRate;
+            const halfdayDeduction = halfdayCount * (0.5 * perDayRate);
+            const netSalary = Math.max(0, monthlySalary - (absentDeduction + halfdayDeduction));
+
+            // Update UI
+            document.getElementById("slip-base-salary").innerText = `$${monthlySalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+            document.getElementById("slip-daily-rate").innerText = `$${perDayRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+            document.getElementById("slip-absent-count").innerText = `${absentDays} Days`;
+            document.getElementById("slip-absent-deduction").innerText = `-$${absentDeduction.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+            document.getElementById("slip-halfday-count").innerText = `${halfdayCount} Half-Days`;
+            document.getElementById("slip-halfday-deduction").innerText = `-$${halfdayDeduction.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+            document.getElementById("slip-net-salary").innerText = `$${netSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+        }
+
+        document.getElementById("select-emp").addEventListener("change", calculatePayslip);
+        document.getElementById("select-month").addEventListener("change", calculatePayslip);
+        document.getElementById("select-year").addEventListener("change", calculatePayslip);
+
+        calculatePayslip();
+    </script>
+</body>
+
+</html>

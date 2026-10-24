@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HCM Lite - Leave Requests</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <nav class="navbar" id="main-nav"></nav>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-title">
+                <span>Employee Leave Requests</span>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Type</th>
+                            <th>Duration</th>
+                            <th>Working Days</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                            <th>Admin Comment</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leave-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        Auth.checkAccess(["admin"]);
+        Auth.renderNavbar("leaves");
+
+        function renderLeaves() {
+            const leaves = Storage.getLeaves();
+            const users = Storage.getUsers();
+            const tbody = document.getElementById("leave-table-body");
+
+            if (leaves.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No leave requests submitted.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = leaves.map(l => {
+                const emp = users.find(u => u.id === l.employeeId) || { name: "Unknown" };
+                const isPending = l.status === "pending";
+                return `
+          <tr>
+            <td><strong>${emp.name}</strong></td>
+            <td>${l.type}</td>
+            <td>${l.from} to ${l.to}</td>
+            <td><strong>${l.days}</strong> day(s)</td>
+            <td>${l.reason}</td>
+            <td><span class="badge badge-${l.status}">${l.status}</span></td>
+            <td>${l.comment || '—'}</td>
+            <td>
+              ${isPending ? `
+                <button class="btn btn-primary btn-sm" onclick="processLeave(${l.id}, 'approved')">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="processLeave(${l.id}, 'rejected')">Reject</button>
+              ` : '—'}
+            </td>
+          </tr>
+        `;
+            }).reverse().join("");
+        }
+
+        function processLeave(id, status) {
+            const comment = prompt(`Add a comment for ${status} status:`) || "";
+            const leaves = Storage.getLeaves();
+            const idx = leaves.findIndex(l => l.id === id);
+            if (idx !== -1) {
+                leaves[idx].status = status;
+                leaves[idx].comment = comment;
+                Storage.set(STORAGE_KEYS.LEAVES, leaves);
+                renderLeaves();
+            }
+        }
+
+        renderLeaves();
+    </script>
+</body>
+
+</html>

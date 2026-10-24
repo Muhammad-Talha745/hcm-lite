@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HCM Lite - Settings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <nav class="navbar" id="main-nav"></nav>
+
+    <div class="container" style="max-width: 600px;">
+        <div class="card">
+            <div class="card-title">
+                <span>Company & Policy Settings</span>
+            </div>
+            <form id="settings-form">
+                <div class="form-group">
+                    <label>Company Name</label>
+                    <input type="text" id="set-name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Office Start Time (24h format)</label>
+                    <input type="time" id="set-start" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Grace Period (minutes)</label>
+                    <input type="number" id="set-grace" class="form-control" min="0" max="60" required>
+                </div>
+                <div class="form-group">
+                    <label>Yearly Leave Quota (days)</label>
+                    <input type="number" id="set-quota" class="form-control" min="1" max="60" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">Save Settings</button>
+                <span id="save-msg"
+                    style="color:var(--primary); font-size:0.875rem; margin-left:0.75rem; display:none;">Saved
+                    successfully!</span>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        Auth.checkAccess(["admin"]);
+        Auth.renderNavbar("settings");
+
+        const company = Storage.getCompany() || {
+            name: "HCM Lite",
+            officeStart: "09:00",
+            graceMinutes: 15,
+            leaveQuota: 15
+        };
+
+        document.getElementById("set-name").value = company.name;
+        document.getElementById("set-start").value = company.officeStart;
+        document.getElementById("set-grace").value = company.graceMinutes;
+        document.getElementById("set-quota").value = company.leaveQuota;
+
+        document.getElementById("settings-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const updated = {
+                ...company,
+                name: document.getElementById("set-name").value.trim(),
+                officeStart: document.getElementById("set-start").value,
+                graceMinutes: parseInt(document.getElementById("set-grace").value),
+                leaveQuota: parseInt(document.getElementById("set-quota").value)
+            };
+            Storage.set(STORAGE_KEYS.COMPANY, updated);
+            const msg = document.getElementById("save-msg");
+            msg.style.display = "inline";
+            setTimeout(() => { msg.style.display = "none"; }, 2500);
+        });
+    </script>
+</body>
+
+</html>

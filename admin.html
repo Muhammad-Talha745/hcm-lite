@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HCM Lite - Admin Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Chart.js CDN for visual metric reporting -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <nav class="navbar" id="main-nav"></nav>
+
+    <div class="container">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+            <div>
+                <h2 id="company-display-name">Admin Dashboard</h2>
+                <p style="color:var(--text-muted); font-size:0.875rem;" id="today-text"></p>
+            </div>
+            <div>
+                <a href="employees.html" class="btn btn-primary btn-sm">+ Add Employee</a>
+            </div>
+        </div>
+
+        <!-- METRICS OVERVIEW -->
+        <div class="grid-4">
+            <div class="metric-box">
+                <h4>Total Employees</h4>
+                <div class="number" id="m-employees">0</div>
+            </div>
+            <div class="metric-box">
+                <h4>Present Today</h4>
+                <div class="number" style="color:var(--primary-dark);" id="m-present">0</div>
+            </div>
+            <div class="metric-box">
+                <h4>Late Today</h4>
+                <div class="number" style="color:var(--warning);" id="m-late">0</div>
+            </div>
+            <div class="metric-box">
+                <h4>Pending Leaves</h4>
+                <div class="number" style="color:var(--danger);" id="m-leaves">0</div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <!-- ATTENDANCE CHART -->
+            <div class="card">
+                <div class="card-title">
+                    <span>Attendance Trend & Split</span>
+                </div>
+                <div style="height:240px; position:relative;">
+                    <canvas id="attendanceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- SMART HELPER CHAT -->
+            <div class="card">
+                <div class="card-title">
+                    <span>Smart Helper (AI Touch)</span>
+                    <span class="badge badge-present">Active</span>
+                </div>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-bubble chat-bot">
+                            Hello Admin! Ask me anything like: <i>"Who is on leave today?"</i>, <i>"Who was late
+                                today?"</i>, or <i>"How many employees do we have?"</i>
+                        </div>
+                    </div>
+                    <form id="chat-form" class="chat-input-area">
+                        <input type="text" id="chat-input" class="form-control" placeholder="Type your question..."
+                            style="border-radius:6px; margin-right:0.4rem;">
+                        <button type="submit" class="btn btn-primary btn-sm">Ask</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- TODAY'S ATTENDANCE TABLE & ANNOUNCEMENTS -->
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">
+                    <span>Today's Attendance Status</span>
+                    <button class="btn btn-outline btn-sm" onclick="exportAttendanceCSV()">Export CSV</button>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Check In</th>
+                                <th>Check Out</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="today-attendance-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span>Company Announcements</span>
+                </div>
+                <form id="announcement-form" style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+                    <input type="text" id="announcement-text" class="form-control" placeholder="Broadcast a message..."
+                        required>
+                    <button type="submit" class="btn btn-primary btn-sm">Post</button>
+                </form>
+                <div id="announcement-list" style="display:flex; flex-direction:column; gap:0.6rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/helper.js"></script>
+    <script>
+        const user = Auth.checkAccess(["admin"]);
+        Auth.renderNavbar("admin");
+
+        const todayStr = Storage.getTodayDateString();
+        document.getElementById("today-text").innerText = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        const company = Storage.getCompany();
+        if (company) document.getElementById("company-display-name").innerText = `${company.name} — Admin Dashboard`;
+
+        function loadDashboardData() {
+            const users = Storage.getUsers();
+            const employees = users.filter(u => u.role === "employee");
+            const attendance = Storage.getAttendance().filter(a => a.date === todayStr);
+            const leaves = Storage.getLeaves();
+            const pendingLeaves = leaves.filter(l => l.status === "pending");
+
+            const presentCount = attendance.filter(a => a.status === "present" || a.status === "late").length;
+            const lateCount = attendance.filter(a => a.status === "late").length;
+
+            document.getElementById("m-employees").innerText = employees.length;
+            document.getElementById("m-present").innerText = presentCount;
+            document.getElementById("m-late").innerText = lateCount;
+            document.getElementById("m-leaves").innerText = pendingLeaves.length;
+
+            // Table Render
+            const tbody = document.getElementById("today-attendance-body");
+            if (attendance.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No check-in logs for today yet.</td></tr>`;
+            } else {
+                tbody.innerHTML = attendance.map(a => {
+                    const emp = users.find(u => u.id === a.employeeId) || { name: "Unknown" };
+                    return `
+            <tr>
+              <td><strong>${emp.name}</strong></td>
+              <td>${a.checkIn || '—'}</td>
+              <td>${a.checkOut || '—'}</td>
+              <td><span class="badge badge-${a.status}">${a.status}</span></td>
+            </tr>
+          `;
+                }).join("");
+            }
+
+            // Render Announcements
+            renderAnnouncements();
+
+            // Render Chart
+            renderChart(presentCount, lateCount, Math.max(0, employees.length - presentCount));
+        }
+
+        function renderAnnouncements() {
+            const list = Storage.getAnnouncements();
+            const container = document.getElementById("announcement-list");
+            if (list.length === 0) {
+                container.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted);">No announcements yet.</p>`;
+                return;
+            }
+            container.innerHTML = list.slice(-5).reverse().map(item => `
+        <div style="padding:0.75rem; border:1px solid var(--border); border-radius:8px; background:var(--bg-main);">
+          <div style="font-size:0.875rem;">${item.text}</div>
+          <span style="font-size:0.75rem; color:var(--text-muted);">${item.date} by ${item.author}</span>
+        </div>
+      `).join("");
+        }
+
+        document.getElementById("announcement-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const txt = document.getElementById("announcement-text");
+            const list = Storage.getAnnouncements();
+            list.push({
+                id: Date.now(),
+                text: txt.value.trim(),
+                author: user.name,
+                date: new Date().toLocaleDateString()
+            });
+            Storage.set(STORAGE_KEYS.ANNOUNCEMENTS, list);
+            txt.value = "";
+            renderAnnouncements();
+        });
+
+        // Smart Chat helper hook
+        document.getElementById("chat-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const input = document.getElementById("chat-input");
+            const text = input.value.trim();
+            if (!text) return;
+
+            const container = document.getElementById("chat-messages");
+            container.innerHTML += `<div class="chat-bubble chat-user">${text}</div>`;
+            input.value = "";
+
+            setTimeout(() => {
+                const reply = SmartHelper.answer(text, user);
+                container.innerHTML += `<div class="chat-bubble chat-bot">${reply}</div>`;
+                container.scrollTop = container.scrollHeight;
+            }, 250);
+        });
+
+        let chartInstance = null;
+        function renderChart(present, late, absent) {
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['On-Time Present', 'Late', 'Absent / Not Checked In'],
+                    datasets: [{
+                        data: [Math.max(0, present - late), late, absent],
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        function exportAttendanceCSV() {
+            const logs = Storage.getAttendance();
+            const users = Storage.getUsers();
+            let csv = "Employee,Date,CheckIn,CheckOut,Status\n";
+            logs.forEach(l => {
+                const emp = users.find(u => u.id === l.employeeId);
+                csv += `"${emp ? emp.name : 'Unknown'}","${l.date}","${l.checkIn || ''}","${l.checkOut || ''}","${l.status}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `attendance_${todayStr}.csv`;
+            a.click();
+        }
+
+        loadDashboardData();
+    </script>
+</body>
+
+</html>

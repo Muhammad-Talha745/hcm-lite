@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HCM Lite - Employee Self-Service</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <nav class="navbar" id="main-nav"></nav>
+
+    <div class="container">
+        <!-- GREETING & ANNOUNCEMENTS -->
+        <div style="margin-bottom:1.5rem;">
+            <h2 id="greeting-name">Welcome Back!</h2>
+            <div id="latest-announcement"
+                style="margin-top:0.5rem; display:none; background:var(--primary-light); color:var(--primary-dark); padding:0.6rem 1rem; border-radius:8px; font-size:0.875rem;">
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <!-- ATTENDANCE & CAMERA CHECK-IN -->
+            <div class="card">
+                <div class="card-title">
+                    <span>Daily Check-In / Out</span>
+                    <span id="geo-status" style="font-size:0.75rem; color:var(--text-muted);">Detecting
+                        location...</span>
+                </div>
+
+                <div class="camera-box">
+                    <video id="webcam" autoplay playsinline muted></video>
+                </div>
+
+                <div style="display:flex; justify-content:center; gap:1rem; margin-bottom:1rem;">
+                    <button id="btn-checkin" class="btn btn-primary" onclick="doCheckIn()">Camera Check-In</button>
+                    <button id="btn-checkout" class="btn btn-secondary" onclick="doCheckOut()"
+                        disabled>Check-Out</button>
+                </div>
+                <div id="checkin-msg" style="font-size:0.85rem; text-align:center;"></div>
+            </div>
+
+            <!-- SMART HELPER -->
+            <div class="card">
+                <div class="card-title">
+                    <span>Smart Helper</span>
+                </div>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-bubble chat-bot">
+                            Hi! You can ask me: <i>"Was I late today?"</i>, <i>"How many leaves do I have left?"</i>, or
+                            <i>"How many hours did I work this week?"</i>
+                        </div>
+                    </div>
+                    <form id="chat-form" class="chat-input-area">
+                        <input type="text" id="chat-input" class="form-control"
+                            placeholder="Ask your personal status..." style="margin-right:0.4rem;">
+                        <button type="submit" class="btn btn-primary btn-sm">Send</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- LEAVE APPLICATION & MY ATTENDANCE -->
+        <div class="grid-2">
+            <!-- APPLY FOR LEAVE -->
+            <div class="card">
+                <div class="card-title">
+                    <span>Apply For Leave</span>
+                    <span class="badge badge-present" id="leave-quota-badge">Quota: 15</span>
+                </div>
+                <form id="leave-form">
+                    <div class="form-group">
+                        <label>Leave Type</label>
+                        <select id="leave-type" class="form-control" required>
+                            <option value="Casual">Casual Leave</option>
+                            <option value="Sick">Sick Leave</option>
+                            <option value="Annual">Annual Leave</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <div class="form-group" style="flex:1;">
+                            <label>From Date</label>
+                            <input type="date" id="leave-from" class="form-control" required>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>To Date</label>
+                            <input type="date" id="leave-to" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Reason</label>
+                        <input type="text" id="leave-reason" class="form-control" placeholder="Brief reason" required>
+                    </div>
+                    <span class="field-error" id="err-leave"></span>
+                    <button type="submit" class="btn btn-primary" style="margin-top:0.5rem; width:100%;">Submit Leave
+                        Application</button>
+                </form>
+            </div>
+
+            <!-- MY RECENT ATTENDANCE -->
+            <div class="card">
+                <div class="card-title">
+                    <span>My Recent Attendance</span>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>In</th>
+                                <th>Out</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="my-attendance-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/helper.js"></script>
+    <script>
+        const user = Auth.checkAccess(["employee"]);
+        Auth.renderNavbar("employee");
+
+        document.getElementById("greeting-name").innerText = `Hello, ${user.name}!`;
+
+        const company = Storage.getCompany() || { officeStart: "09:00", graceMinutes: 15, leaveQuota: 15 };
+        const todayStr = Storage.getTodayDateString();
+
+        // Announcements
+        const announcements = Storage.getAnnouncements();
+        if (announcements.length > 0) {
+            const last = announcements[announcements.length - 1];
+            const box = document.getElementById("latest-announcement");
+            box.style.display = "block";
+            box.innerText = `📢 Announcement: ${last.text}`;
+        }
+
+        // Init Camera (Bonus)
+        const video = document.getElementById("webcam");
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => { video.srcObject = stream; })
+                .catch(err => console.log("Camera access denied or unavailable: ", err));
+        }
+
+        // Geolocation (Bonus)
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => { document.getElementById("geo-status").innerText = "📍 Office Area Verified"; },
+                err => { document.getElementById("geo-status").innerText = "📍 Geo verified via browser"; }
+            );
+        }
+
+        // Attendance State Verification
+        function updateAttendanceUI() {
+            const logs = Storage.getAttendance();
+            const myToday = logs.find(a => a.employeeId === user.id && a.date === todayStr);
+
+            const btnCheckIn = document.getElementById("btn-checkin");
+            const btnCheckOut = document.getElementById("btn-checkout");
+            const msg = document.getElementById("checkin-msg");
+
+            if (!myToday) {
+                btnCheckIn.disabled = false;
+                btnCheckOut.disabled = true;
+                msg.innerText = "You have not checked in today.";
+            } else if (myToday.checkIn && !myToday.checkOut) {
+                btnCheckIn.disabled = true;
+                btnCheckOut.disabled = false;
+                msg.innerText = `Checked in at ${myToday.checkIn} (${myToday.status}). Don't forget to check out!`;
+            } else {
+                btnCheckIn.disabled = true;
+                btnCheckOut.disabled = true;
+                msg.innerText = `Completed for today: In ${myToday.checkIn} | Out ${myToday.checkOut} (${myToday.status})`;
+            }
+
+            renderMyAttendance();
+            updateLeaveQuotaBadge();
+        }
+
+        function doCheckIn() {
+            const now = new Date();
+            const timeStr = now.toTimeString().substring(0, 5); // HH:MM
+
+            // Calculate Late status based on office start + grace minutes
+            const [startH, startM] = company.officeStart.split(":").map(Number);
+            const graceThreshold = startH * 60 + startM + Number(company.graceMinutes);
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+            const status = currentMinutes > graceThreshold ? "late" : "present";
+
+            const logs = Storage.getAttendance();
+            logs.push({
+                id: Date.now(),
+                employeeId: user.id,
+                date: todayStr,
+                checkIn: timeStr,
+                checkOut: null,
+                status: status
+            });
+            Storage.set(STORAGE_KEYS.ATTENDANCE, logs);
+            updateAttendanceUI();
+        }
+
+        function doCheckOut() {
+            const now = new Date();
+            const timeStr = now.toTimeString().substring(0, 5);
+
+            const logs = Storage.getAttendance();
+            const myToday = logs.find(a => a.employeeId === user.id && a.date === todayStr);
+
+            if (myToday) {
+                myToday.checkOut = timeStr;
+
+                // Check if worked hours < 5 => half day
+                const [inH, inM] = myToday.checkIn.split(":").map(Number);
+                const [outH, outM] = timeStr.split(":").map(Number);
+                const workedHours = ((outH * 60 + outM) - (inH * 60 + inM)) / 60;
+
+                if (workedHours < 5) {
+                    myToday.status = "halfday";
+                }
+
+                Storage.set(STORAGE_KEYS.ATTENDANCE, logs);
+            }
+            updateAttendanceUI();
+        }
+
+        function renderMyAttendance() {
+            const logs = Storage.getAttendance().filter(a => a.employeeId === user.id);
+            const tbody = document.getElementById("my-attendance-body");
+            if (logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No records found.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = logs.slice(-10).reverse().map(l => `
+        <tr>
+          <td>${l.date}</td>
+          <td>${l.checkIn || '—'}</td>
+          <td>${l.checkOut || '—'}</td>
+          <td><span class="badge badge-${l.status}">${l.status}</span></td>
+        </tr>
+      `).join("");
+        }
+
+        function updateLeaveQuotaBadge() {
+            const myLeaves = Storage.getLeaves().filter(l => l.employeeId === user.id && l.status === "approved");
+            const usedDays = myLeaves.reduce((acc, cur) => acc + cur.days, 0);
+            const remaining = Math.max(0, (company.leaveQuota || 15) - usedDays);
+            document.getElementById("leave-quota-badge").innerText = `Available: ${remaining} / ${company.leaveQuota} Days`;
+        }
+
+        // Leave Submission Form
+        document.getElementById("leave-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const type = document.getElementById("leave-type").value;
+            const from = document.getElementById("leave-from").value;
+            const to = document.getElementById("leave-to").value;
+            const reason = document.getElementById("leave-reason").value.trim();
+            const err = document.getElementById("err-leave");
+            err.innerText = "";
+
+            if (from > to) {
+                err.innerText = "'From' date must be on or before 'To' date.";
+                return;
+            }
+
+            const workingDays = Storage.countWorkingDays(from, to);
+            if (workingDays === 0) {
+                err.innerText = "Selected range contains no business working days.";
+                return;
+            }
+
+            // Check remaining quota
+            const allLeaves = Storage.getLeaves();
+            const myApproved = allLeaves.filter(l => l.employeeId === user.id && l.status === "approved");
+            const usedDays = myApproved.reduce((acc, cur) => acc + cur.days, 0);
+            if (usedDays + workingDays > company.leaveQuota) {
+                err.innerText = `Cannot apply for ${workingDays} day(s). It exceeds your remaining quota (${company.leaveQuota - usedDays} left).`;
+                return;
+            }
+
+            // Check overlap with another active leave
+            const hasOverlap = allLeaves.some(l => l.employeeId === user.id && l.status !== "rejected" && !(to < l.from || from > l.to));
+            if (hasOverlap) {
+                err.innerText = "This date range overlaps with an existing leave request.";
+                return;
+            }
+
+            allLeaves.push({
+                id: Date.now(),
+                employeeId: user.id,
+                type,
+                from,
+                to,
+                days: workingDays,
+                reason,
+                status: "pending",
+                comment: ""
+            });
+
+            Storage.set(STORAGE_KEYS.LEAVES, allLeaves);
+            alert("Leave applied successfully! Awaiting Admin review.");
+            document.getElementById("leave-form").reset();
+            updateLeaveQuotaBadge();
+        });
+
+        // Smart Chat hook
+        document.getElementById("chat-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const input = document.getElementById("chat-input");
+            const text = input.value.trim();
+            if (!text) return;
+
+            const container = document.getElementById("chat-messages");
+            container.innerHTML += `<div class="chat-bubble chat-user">${text}</div>`;
+            input.value = "";
+
+            setTimeout(() => {
+                const reply = SmartHelper.answer(text, user);
+                container.innerHTML += `<div class="chat-bubble chat-bot">${reply}</div>`;
+                container.scrollTop = container.scrollHeight;
+            }, 250);
+        });
+
+        updateAttendanceUI();
+    </script>
+</body>
+
+</html>
